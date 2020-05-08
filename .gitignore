@@ -1,3 +1,4 @@
 log.txt
 backups/
 .DS_Store
+.idea/
