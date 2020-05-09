@@ -10,6 +10,9 @@ import argparse
 import tarfile
 
 WORK_DIR = str(Path(__file__).parent.absolute()) + '/backups/'
+"""
+List of files on root directory that will be backed up
+"""
 BACKUP_FILES = [
     "players", "plugin_data", "plugins", "PocketMine-MP.phar",
     "resource_packs", "virions", "worlds", "banned-ips.txt",
@@ -37,9 +40,9 @@ parser.add_argument("--path", type=str, action='append', metavar="POCKETMINE_PAT
 parser.add_argument("-a", action="store_true", dest="archive",
                     help="Archive all the zips to a master zip")
 args = parser.parse_args()
-folders = []
+pmmp_folders = []
 if args.path is not None:
-    folders = [*args.path]
+    pmmp_folders = [*args.path]
 
 
 # Validate PocketMine-MP path (roughly)
@@ -63,25 +66,25 @@ for file in Path(WORK_DIR).glob("*.tar.gz"):
 
 
 processed_tarfiles = []
-for folder in folders:
-    folder_path = Path(folder)
+for pmmp_folder in pmmp_folders:
+    pmmp_folder_path = Path(pmmp_folder)
 
     # Checking...
-    if not folder_path.exists():
-        print("The folder {} does not exist. Skipping.".format(folder))
+    if not pmmp_folder_path.exists():
+        print("The folder {} does not exist. Skipping.".format(pmmp_folder))
         continue
-    if not validate_path(folder):
-        print("{} is not a valid PMMP path.".format(folder))
+    if not validate_path(pmmp_folder):
+        print("{} is not a valid PMMP path.".format(pmmp_folder))
         continue
 
     # Finding new zip name
-    tarName = base_tarName = "{}-{}.tar.gz".format(folder_path.name, time.strftime("%Y%m%d-%H%M%S"))
+    tarName = base_tarName = "{}-{}.tar.gz".format(pmmp_folder_path.name, time.strftime("%Y%m%d-%H%M%S"))
     i = 1  # In case it already existed, for whatever reason
     while Path(WORK_DIR + tarName).exists():
         tarName = base_tarName + "_" + str(i) + ".tar.gz"
         i += 1
 
-    print("Backing up \"{}\":".format(folder))
+    print("Backing up \"{}\":".format(pmmp_folder))
 
     # Start compressing
     """
@@ -89,8 +92,8 @@ for folder in folders:
     folders are large in size and no. of files. Thus make
     accessing the backup easier and faster.
     """
-    players_archive_name = shutil.make_archive(folder_path / "tmp/players", "gztar", folder_path, "players")
-    worlds_archive_name = shutil.make_archive(folder_path / "tmp/worlds", "gztar", folder_path, "worlds")
+    players_archive_name = shutil.make_archive(pmmp_folder_path / "tmp/players", "gztar", pmmp_folder_path, "players")
+    worlds_archive_name = shutil.make_archive(pmmp_folder_path / "tmp/worlds", "gztar", pmmp_folder_path, "worlds")
 
     """
     Okay, now we start archiving the folder, except
@@ -105,13 +108,17 @@ for folder in folders:
         tar.add(worlds_archive_name, Path(worlds_archive_name).name)
 
         # Add remaining files
-        for sub in folder_path.glob("*"):
-            if sub.name not in BACKUP_FILES:
+        for sub in pmmp_folder_path.glob("*"):
+            """
+            Files (specifically temporary files, like SQLite journals)
+            could vanish while others files are being added. We check exists() here.
+            """
+            if sub.name not in BACKUP_FILES or not sub.exists():
                 continue
             tar.add(sub, sub.name)
 
     # Delete tmp folder
-    shutil.rmtree(folder_path / "tmp")
+    shutil.rmtree(pmmp_folder_path / "tmp")
 
     print("Done! Target file: {}".format(tarName))
     processed_tarfiles.append(tarName)
